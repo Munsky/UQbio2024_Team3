@@ -39,7 +39,7 @@ def process_data(filepath,figName):
     model2 = models.Cellpose(gpu = False, model_type = 'cyto')
 
     # Apply the model to your image
-    masks_nuc, flows, styles, diams = model2.eval(img_nuc, diameter=None, channels=[0,0])
+    masks_nuc, flows, styles, diams = model2.eval(img_nuc, diameter=50, channels=[0,0])
     # Plotting each one of the 3 colors independently
     ax[1].imshow(masks_nuc,cmap='Spectral')
     ax[1].axis('off')
