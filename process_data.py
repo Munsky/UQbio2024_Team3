@@ -1,5 +1,26 @@
 def process_data(filepath,figName):
-
+    # Loading libraries for the course
+    import random
+    import matplotlib.pyplot as plt             # Library used for plotting
+    from matplotlib.patches import Rectangle    # Module to plot a rectangle in the image
+    import urllib.request                       # Library to download data
+    import numpy as np                          # Library for array manipulation
+    import seaborn as sn                        # Library for advanced plotting
+    import pandas as pd                         # Library to manipulate data frames
+    import tifffile                             # Library to store numpy arrays as TIFF
+    import pathlib                              # Library to work with file paths
+    from pathlib import Path                    # Library to work with file paths
+    import skimage                              # Library for image manipulation. scikit-image
+    from skimage.io import imread               # Module from skimage
+    from matplotlib import animation            # Module to plot animations
+    from skimage import filters, measure, segmentation, color
+    from scipy.ndimage import gaussian_filter
+    from skimage.filters import difference_of_gaussians
+    import pandas as pd
+    from cellpose import models, plot
+    from scipy import ndimage as ndi
+    import os
+    
     # Loading data
     img = imread(str(figName))
 
