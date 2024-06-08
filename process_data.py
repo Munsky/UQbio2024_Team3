@@ -20,7 +20,7 @@ def process_data(filepath,figName):
     from cellpose import models, plot
     from scipy import ndimage as ndi
     import os
-    
+
     # Loading data
     img = imread(str(figName))
 
@@ -39,7 +39,7 @@ def process_data(filepath,figName):
     model2 = models.Cellpose(gpu = False, model_type = 'cyto')
 
     # Apply the model to your image
-    masks_nuc, flows, styles, diams = model2.eval(img_nuc, diameter=None, channels=[0,0])
+    masks_nuc, flows, styles, diams = model2.eval(img_nuc, diameter=50, channels=[0,0])
     # Plotting each one of the 3 colors independently
     ax[1].imshow(masks_nuc,cmap='Spectral')
     ax[1].axis('off')
@@ -289,8 +289,6 @@ def process_data(filepath,figName):
         'trans_num': num_trans,
     })
 
-    df_info.to_csv(os.path.join(filepath,'Basic_Information.csv'), index=False)
-
     # %% [markdown]
     # Protein Intensity
 
@@ -333,3 +331,59 @@ def process_data(filepath,figName):
 
     # Save the DataFrame
     df_protein.to_csv(os.path.join(filepath,'protein_intensity.csv'), index=False)
+
+    #cell_life_span
+    #createDataFrame
+    df_nuc = pd.DataFrame()
+
+    # t_total = img.shape[0]
+
+    for t in range(t_total):
+        # If the frame has multiple channels, use only the first channel
+        frame = img[t, :, :, 0]
+        df_protein['cell id'] = np.nan
+        df_protein['frame'+str(t+1)] = np.nan
+        # Get unique cell masks
+        unique_masks = np.unique(masks_nuc)
+        
+        # Loop through each unique mask (cell)
+        for cell_id in unique_masks:
+            if cell_id == 0:
+                continue  # Skip background
+            
+            # Create a mask for the current cell
+            cell_mask = (masks_nuc == cell_id).astype(np.uint8)
+            
+            # Check the sizes of the frame and cell_mask
+            if frame.shape != cell_mask.shape:
+                print(f"Size mismatch: frame shape {frame.shape}, cell_mask shape {cell_mask.shape}")
+                continue
+            
+            # Calculate the mean intensity of the current cell
+            total_intensity = np.sum(frame * cell_mask)
+            area = np.sum(cell_mask)
+            mean_intensity = total_intensity / area if area > 0 else 0
+            
+            # Append the results to the list
+            df_nuc.loc[cell_id-1, 'cell id'] = int(cell_id)
+            df_nuc.loc[cell_id-1, 'frame'+str(t+1)] = mean_intensity
+
+    # Define the threshold as 80% of the first frame's intensity
+    threshold = 0.8 * df_nuc['frame1']
+
+    # Initialize the life_span column with NaN
+    df_info['life_span'] = np.nan
+
+    # Loop over each row (cell) in the DataFrame
+    for i, row in df_nuc.iterrows():
+        # Find the first frame where the intensity is below the threshold
+        life_span = np.argmax(row[1:] < threshold[i])
+        
+        # If the intensity never goes below the threshold, set life_span to the total number of frames
+        if life_span == 0:
+            life_span = len(row[1:])
+        
+        # Store the life_span in the DataFrame
+        df_info.loc[i, 'life_span'] = life_span
+
+    df_info.to_csv(os.path.join(filepath,'Basic_Information.csv'), index=False)
