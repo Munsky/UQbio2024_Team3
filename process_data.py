@@ -86,6 +86,39 @@ def process_data(filepath,figName):
         updated_masks_nuc[masks_nuc == nucleus_label] = cell_label
     masks_nuc = updated_masks_nuc
 
+    # %%
+    # live cell number
+    # live cell number
+    t_total = img.shape[0]
+    th_nuc = 80
+    df_cells_alive = pd.DataFrame(index = ['number of live cells', 'live cell id'], dtype=object)
+    nucleus_labels = np.unique(masks_nuc)
+
+    for t in range(t_total):
+        num_t = 0
+        list_cells_alive = []
+        image = img[t, :, :, 0]
+        for id in nucleus_labels:
+            if id == 0:
+                continue  # Skip background
+            
+            cell_mask = (masks_nuc == id)
+            
+            # Calculate the mean intensity of the current cell
+            total_intensity = np.sum(image * cell_mask)
+            area = np.sum(cell_mask)
+            mean_intensity = total_intensity / area if area > 0 else 0
+
+            if mean_intensity > th_nuc:
+            num_t += 1
+            list_cells_alive.append(id)
+            # Append the results to the list
+        df_cells_alive.loc['number of live cells', 'frame'+str(t+1)] = int(num_t)
+        df_cells_alive['frame'+str(t+1)] = df_cells_alive['frame'+str(t+1)].astype('object')
+        df_cells_alive.at['live cell id', 'frame'+str(t+1)] = list_cells_alive
+
+        df_cells_alive.to_csv(os.path.join(filepath,'viable_cells.csv'), index=False)
+
     # %% [markdown]
     # calculate the number of mRNAs in each nuclei and cytoplasm
 
@@ -101,8 +134,39 @@ def process_data(filepath,figName):
     df_m_c['cell id'] = cell_id[1:]
     df_m_n['cell id'] = cell_id[1:]
 
+
+    # get the area of a single mRNA
+    mRNA = img[0, :, :, 2]
+    mRNA_filtered = difference_of_gaussians(mRNA, low_sigma=1, high_sigma=5)
+
+    mRNA_binary = mRNA_filtered.copy()
+    mRNA_binary[mRNA_binary>=threshold_m] = threshold_m # Making spots above the threshold equal to the threshold value.
+    mRNA_binary[mRNA_binary<threshold_m] = 0 # Making spots below the threshold equal to 0.
+
+    mRNA_binary[mRNA_binary!=0] = 1 # Binarization
+
+    # spot_contours = measure.find_contours(mRNA_binary, 0.9) # only used for figure generation
+
+    labels_m = measure.label(mRNA_binary)
+
+    props = measure.regionprops(labels_m, intensity_image=mRNA)
+
+    # Initialize a list to store the intensities
+    areas = []
+
+    # Loop through each mRNA in the image
+    for prop in props:
+        # Calculate the intensity of the current mRNA and add it to the list
+        areas.append(prop.area)
+
+    areas = np.array(areas)
+    areas_sorted = np.sort(areas)
+    start = np.percentile(areas_sorted, 10)
+    end = np.percentile(areas_sorted, 50)
+    selected_areas = areas_sorted[(areas_sorted>=start) & (areas_sorted<=end)]
+    single_mRNA_area = np.mean(selected_areas)
+
     for t in range(t_total):
-        # get the area of a single mRNA
         mRNA = img[t, :, :, 2]
         mRNA_filtered = difference_of_gaussians(mRNA, low_sigma=1, high_sigma=5)
 
@@ -112,28 +176,9 @@ def process_data(filepath,figName):
 
         mRNA_binary[mRNA_binary!=0] = 1 # Binarization
 
-        spot_contours = measure.find_contours(mRNA_binary, 0.9)
+        # spot_contours = measure.find_contours(mRNA_binary, 0.9) # only used for figure generation
 
         labels_m = measure.label(mRNA_binary)
-
-        props = measure.regionprops(labels_m, intensity_image=mRNA)
-
-        # Initialize a list to store the intensities
-        areas = []
-
-        # Loop through each mRNA in the image
-        for prop in props:
-            # Calculate the intensity of the current mRNA and add it to the list
-
-            areas.append(prop.area)
-
-        areas = np.array(areas)
-        areas_sorted = np.sort(areas)
-        start = np.percentile(areas_sorted, 10)
-        end = np.percentile(areas_sorted, 50)
-        selected_areas = areas_sorted[(areas_sorted>=start) & (areas_sorted<=end)]
-        single_mRNA_area = np.mean(selected_areas)
-
         mRNA_num_cyto = []
         mRNA_num_nuc = []
 
@@ -147,20 +192,22 @@ def process_data(filepath,figName):
 
             # Calculate the properties of the mRNAs in the current cell
             props_n = measure.regionprops(labels_m * nuc_mask, intensity_image = mRNA)
+            if props_n == []:
+                mRNA_num_nuc.append(0)
+            else:
+                # Initialize the total area, total intensity and count for the current cell
+                total_area_n = 0
+                count_n = 0
 
-            # Initialize the total area, total intensity and count for the current cell
-            total_area_n = 0
-            count_n = 0
+                # Loop through each mRNA in the current cell
+                for prop in props_n:
+                    # Update the total area, total intensity and count
+                    total_area_n += prop.area
 
-            # Loop through each mRNA in the current cell
-            for prop in props_n:
-                # Update the total area, total intensity and count
-                total_area_n += prop.area
+                count_n = round(total_area_n / single_mRNA_area)
+                # Add the results for the current cell to the DataFrame
 
-            count_n = round(total_area_n / single_mRNA_area)
-            # Add the results for the current cell to the DataFrame
-
-            mRNA_num_nuc.append(count_n)
+                mRNA_num_nuc.append(count_n)
             
             # Get the mask for the current cell
             mask_c = (masks_cyto == id)
@@ -170,19 +217,22 @@ def process_data(filepath,figName):
             # Calculate the properties of the mRNAs in the current cell
             props_c = measure.regionprops(labels_m * cyto_mask, intensity_image = mRNA)
 
-            # Initialize the total area, total intensity and count for the current cell
-            total_area_c = 0
-            count_c = 0
+            if props_c == []:
+                mRNA_num_cyto.append(0)
+            else:  
+                # Initialize the total area, total intensity and count for the current cell
+                total_area_c = 0
+                count_c = 0
 
-            # Loop through each mRNA in the current cell
-            for prop in props_c:
-                # Update the total intensity and count
-                total_area_c += prop.area
+                # Loop through each mRNA in the current cell
+                for prop in props_c:
+                    # Update the total intensity and count
+                    total_area_c += prop.area
 
-            count_c = round(total_area_c / single_mRNA_area)
-            # Add the results for the current cell to the DataFrame
+                count_c = round(total_area_c / single_mRNA_area)
+                # Add the results for the current cell to the DataFrame
 
-            mRNA_num_cyto.append(count_c)
+                mRNA_num_cyto.append(count_c)
 
         df_m_c['frame' + str(t+1)] = mRNA_num_cyto
         df_m_n['frame' + str(t+1)] = mRNA_num_nuc
