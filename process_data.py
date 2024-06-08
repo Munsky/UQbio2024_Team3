@@ -110,8 +110,8 @@ def process_data(filepath,figName):
             mean_intensity = total_intensity / area if area > 0 else 0
 
             if mean_intensity > th_nuc:
-            num_t += 1
-            list_cells_alive.append(id)
+                num_t += 1
+                list_cells_alive.append(id)
             # Append the results to the list
         df_cells_alive.loc['number of live cells', 'frame'+str(t+1)] = int(num_t)
         df_cells_alive['frame'+str(t+1)] = df_cells_alive['frame'+str(t+1)].astype('object')
