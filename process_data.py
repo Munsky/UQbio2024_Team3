@@ -96,10 +96,10 @@ def process_data(filepath,figName):
     image = img[0, :, :, 0]
 
     for i in nucleus_labels:
-        if id == 0:
+        if i == 0:
                 continue  # Skip background
         
-        cell_mask_0 = (masks_nuc == id)
+        cell_mask_0 = (masks_nuc == i)
         total_intensity = np.sum(image * cell_mask_0)
         area = np.sum(cell_mask_0)
         mean_intensity = total_intensity / area if area > 0 else 0
