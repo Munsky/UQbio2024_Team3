@@ -128,6 +128,7 @@ def process_data(filepath,figName):
         df_cells_alive['frame'+str(t+1)] = df_cells_alive['frame'+str(t+1)].astype('object')
         df_cells_alive.at['live cell id', 'frame'+str(t+1)] = list_cells_alive
 
+    df_cells_alive.to_csv(os.path.join(filepath,'viable_cells.csv'), index=False)
     # %% [markdown]
     # calculate the number of mRNAs in each nuclei and cytoplasm
 
