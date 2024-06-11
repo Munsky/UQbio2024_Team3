@@ -90,9 +90,20 @@ def process_data(filepath,figName):
     # live cell number
     # live cell number
     t_total = img.shape[0]
-    th_nuc = 80
+    th_nuc = []
     df_cells_alive = pd.DataFrame(index = ['number of live cells', 'live cell id'], dtype=object)
     nucleus_labels = np.unique(masks_nuc)
+    image = img[0, :, :, 0]
+
+    for i in nucleus_labels:
+        if id == 0:
+                continue  # Skip background
+        
+        cell_mask_0 = (masks_nuc == id)
+        total_intensity = np.sum(image * cell_mask_0)
+        area = np.sum(cell_mask_0)
+        mean_intensity = total_intensity / area if area > 0 else 0
+        th_nuc.append(0.8 * mean_intensity)
 
     for t in range(t_total):
         num_t = 0
@@ -109,15 +120,13 @@ def process_data(filepath,figName):
             area = np.sum(cell_mask)
             mean_intensity = total_intensity / area if area > 0 else 0
 
-            if mean_intensity > th_nuc:
+            if mean_intensity > th_nuc[id-1]:
                 num_t += 1
                 list_cells_alive.append(id)
             # Append the results to the list
         df_cells_alive.loc['number of live cells', 'frame'+str(t+1)] = int(num_t)
         df_cells_alive['frame'+str(t+1)] = df_cells_alive['frame'+str(t+1)].astype('object')
         df_cells_alive.at['live cell id', 'frame'+str(t+1)] = list_cells_alive
-
-        df_cells_alive.to_csv(os.path.join(filepath,'viable_cells.csv'), index=False)
 
     # %% [markdown]
     # calculate the number of mRNAs in each nuclei and cytoplasm
